@@ -1,8 +1,0 @@
-flask
-flask-cors
-pandas
-openpyxl
-sqlalchemy
-psycopg2-binary
-apscheduler
-twilio

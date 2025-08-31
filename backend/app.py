@@ -1,307 +1,221 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify,send_file
 from flask_cors import CORS
-from werkzeug.utils import secure_filename
-from datetime import datetime, date
-import os
-import io
 import pandas as pd
-from sqlalchemy.orm import Session
-from backend.database import SessionLocal, engine, Base
-from backend import models
-from backend.services.risk import compute_risk_level, ensure_default_settings
-from backend.services.reports import build_weekly_reports
-from backend.services.alerts import send_alerts
-from apscheduler.schedulers.background import BackgroundScheduler
+import smtplib
+from email.mime.text import MIMEText
+import io
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from openpyxl import Workbook
+import sqlite3
 
-ALLOWED_EXTENSIONS = {"csv", "xlsx", "xls"}
+app = Flask(__name__)
+CORS(app)  # Allow React frontend to access backend
 
-def allowed_file(filename: str) -> bool:
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+# In-memory storage (for now)
+student_data = {
+    "attendance": pd.DataFrame(),
+    "exam_results": pd.DataFrame(),
+    "fee_payments": pd.DataFrame()
+}
 
-def create_app():
-    app = Flask(__name__)
-    CORS(app)
-    Base.metadata.create_all(bind=engine)
+@app.route('/upload/<data_type>', methods=['POST'])
+def upload_file(data_type):
+    if 'file' not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+    
+    file = request.files['file']
+    try:
+        df = pd.read_excel(file)
+        student_data[data_type] = df
+        return jsonify({"message": f"{data_type} uploaded successfully!"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-    # Scheduler for weekly reports/alerts (Sunday 6am)
-    scheduler = BackgroundScheduler()
-    @scheduler.scheduled_job("cron", day_of_week="sun", hour=6, minute=0)
-    def weekly_job():
-        with SessionLocal() as db:
-            ensure_default_settings(db)
-            reports = build_weekly_reports(db)
-            send_alerts(db, reports)
-    scheduler.start()
+@app.route('/data/<data_type>', methods=['GET'])
+def get_data(data_type):
+    if data_type not in student_data:
+        return jsonify({"error": "Invalid data type"}), 400
+    return student_data[data_type].to_json(orient="records")
 
-    @app.route("/api/health")
-    def health():
-        return {"ok": True, "time": datetime.utcnow().isoformat()}
+def calculate_risk():
+    # Check if all files are uploaded
+    if student_data['attendance'].empty:
+        return {"error": "Attendance file missing or empty"}
+    if student_data['exam_results'].empty:
+        return {"error": "Exam results file missing or empty"}
+    if student_data['fee_payments'].empty:
+        return {"error": "Fee payments file missing or empty"}
 
-    @app.route("/api/settings", methods=["GET", "PUT"])
-    def settings():
-        with SessionLocal() as db:
-            s = ensure_default_settings(db)
-            if request.method == "PUT":
-                data = request.get_json()
-                s.attendance_low = data.get("attendance_low", s.attendance_low)
-                s.attendance_medium = data.get("attendance_medium", s.attendance_medium)
-                s.score_low = data.get("score_low", s.score_low)
-                s.score_medium = data.get("score_medium", s.score_medium)
-                s.fee_days_overdue_medium = data.get("fee_days_overdue_medium", s.fee_days_overdue_medium)
-                s.fee_days_overdue_high = data.get("fee_days_overdue_high", s.fee_days_overdue_high)
-                db.add(s); db.commit(); db.refresh(s)
-            return jsonify({
-                "attendance_low": s.attendance_low,
-                "attendance_medium": s.attendance_medium,
-                "score_low": s.score_low,
-                "score_medium": s.score_medium,
-                "fee_days_overdue_medium": s.fee_days_overdue_medium,
-                "fee_days_overdue_high": s.fee_days_overdue_high,
-            })
+    att_df = student_data['attendance'].copy()
+    exam_df = student_data['exam_results'].copy()
+    fee_df = student_data['fee_payments'].copy()
 
-    @app.route("/api/upload", methods=["POST"])
-    def upload():
-        files = request.files
-        processed = 0
-        with SessionLocal() as db:
-            ensure_default_settings(db)
-            # Attendance
-            if "attendance" in files and allowed_file(files["attendance"].filename):
-                df = read_any(files["attendance"])
-                processed += import_attendance(db, df)
-            # Exams
-            if "exams" in files and allowed_file(files["exams"].filename):
-                df = read_any(files["exams"])
-                processed += import_exams(db, df)
-            # Fees
-            if "fees" in files and allowed_file(files["fees"].filename):
-                df = read_any(files["fees"])
-                processed += import_fees(db, df)
-            # Recompute risk for all students
-            recompute_all_risk(db)
-        return jsonify({"processed": processed})
+    # --- Data validation and cleaning (your existing code is good here) ---
+    required_att = {'student_id', 'name', 'present'}
+    required_exam = {'student_id', 'name', 'score'}
+    required_fee = {'student_id', 'name', 'amount_due', 'amount_paid'}
 
-    @app.route("/api/classes")
-    def classes():
-        with SessionLocal() as db:
-            rows = db.query(models.Classroom).all()
-            return jsonify([{"id": r.id, "name": r.name} for r in rows])
+    if not required_att.issubset(att_df.columns):
+        return {"error": "Attendance file must have: student_id, name, present"}
+    if not required_exam.issubset(exam_df.columns):
+        return {"error": "Exam results file must have: student_id, name, score"}
+    if not required_fee.issubset(fee_df.columns):
+        return {"error": "Fee payments file must have: student_id, name, amount_due, amount_paid"}
 
-    @app.route("/api/subjects")
-    def subjects():
-        with SessionLocal() as db:
-            rows = db.query(models.Subject).all()
-            return jsonify([{"id": r.id, "name": r.name} for r in rows])
+    # Ensure numeric values and drop NaNs
+    exam_df['score'] = pd.to_numeric(exam_df['score'], errors='coerce')
+    fee_df['amount_due'] = pd.to_numeric(fee_df['amount_due'], errors='coerce')
+    fee_df['amount_paid'] = pd.to_numeric(fee_df['amount_paid'], errors='coerce')
+    att_df['present'] = pd.to_numeric(att_df['present'], errors='coerce')
+    exam_df = exam_df.dropna(subset=['score'])
+    fee_df = fee_df.dropna(subset=['amount_due', 'amount_paid'])
+    att_df = att_df.dropna(subset=['present'])
 
-    @app.route("/api/students")
-    def students():
-        class_id = request.args.get("classId", "all")
-        risk = request.args.get("risk", "all")
-        subject_id = request.args.get("subjectId", "all")
+    # --- Calculate individual risks ---
+    att_df['attendance_risk'] = att_df['present'].apply(lambda x: 0 if x >= 0.75 else 1)
+    
+    exam_risk_df = exam_df.groupby('student_id')['score'].min().reset_index()
+    exam_risk_df['exam_risk'] = exam_risk_df['score'].apply(lambda x: 1 if x < 40 else 0)
 
-        with SessionLocal() as db:
-            q = db.query(models.Student)
-            if class_id != "all":
-                q = q.filter(models.Student.class_id == class_id)
-            students = q.all()
+    fee_risk_df = fee_df.groupby('student_id', group_keys=False)[['amount_due', 'amount_paid']].apply(
+        lambda x: 1 if (x['amount_due'] - x['amount_paid']).sum() > 0 else 0
+    ).reset_index(name='fee_risk')
 
-            # Aggregate metrics
-            result = []
-            for st in students:
-                attendance_pct = st.attendance_pct or 0.0
-                avg_score = st.avg_score or 0.0
-                fee_status = st.fee_status or "ok"
-                level = st.risk_level or "low"
-                if risk != "all" and level != risk:
-                    continue
-                # subject filter: include if student has any exam in subject
-                if subject_id != "all":
-                    has_subject = any(er.subject_id == subject_id for er in st.exam_results)
-                    if not has_subject:
-                        continue
-                result.append({
-                    "student_id": st.id,
-                    "name": st.name,
-                    "class_id": st.class_id,
-                    "class_name": st.classroom.name if st.classroom else "",
-                    "attendance_pct": attendance_pct,
-                    "avg_score": avg_score,
-                    "fee_status": fee_status,
-                    "risk_level": level,
-                })
-            return jsonify(result)
+    # --- Merge all risks and the name column ---
+    # Start with attendance data to get student_id and name
+    risk_df = att_df[['student_id', 'name']].drop_duplicates().copy()
+    
+    # Merge attendance risk
+    att_risk_summary = att_df.groupby('student_id')['attendance_risk'].max().reset_index()
+    risk_df = risk_df.merge(att_risk_summary, on='student_id', how='left')
 
-    @app.route("/api/metrics/risk-summary")
-    def risk_summary():
-        class_id = request.args.get("classId", "all")
-        subject_id = request.args.get("subjectId", "all")
-        with SessionLocal() as db:
-            q = db.query(models.Student)
-            if class_id != "all":
-                q = q.filter(models.Student.class_id == class_id)
-            students = q.all()
-            total = 0; low=0; med=0; high=0
-            for st in students:
-                # subject filter
-                if subject_id != "all":
-                    has_subject = any(er.subject_id == subject_id for er in st.exam_results)
-                    if not has_subject:
-                        continue
-                total += 1
-                if st.risk_level == "high": high += 1
-                elif st.risk_level == "medium": med += 1
-                else: low += 1
-            return jsonify({"total": total, "low": low, "medium": med, "high": high})
+    # Merge exam and fee risks
+    risk_df = risk_df.merge(exam_risk_df[['student_id', 'exam_risk']], on='student_id', how='left')
+    risk_df = risk_df.merge(fee_risk_df, on='student_id', how='left')
 
-    @app.route("/api/metrics/attendance-trend")
-    def attendance_trend():
-        class_id = request.args.get("classId", "all")
-        subject_id = request.args.get("subjectId", "all")  # not used for attendance but accepted
-        with SessionLocal() as db:
-            q = db.query(models.Attendance)
-            if class_id != "all":
-                q = q.join(models.Student).filter(models.Student.class_id == class_id)
-            # Compute daily average attendance %
-            by_date = {}
-            rows = q.all()
-            for r in rows:
-                key = r.date.isoformat()
-                by_date.setdefault(key, {"present": 0, "total": 0})
-                by_date[key]["present"] += 1 if r.present else 0
-                by_date[key]["total"] += 1
-            data = [{"date": k, "attendance_pct": round(v["present"]/v["total"]*100, 1) if v["total"] else 0} for k, v in sorted(by_date.items())]
-            return jsonify(data)
+    # Fill NaN values that might result from the left merges
+    risk_df[['attendance_risk', 'exam_risk', 'fee_risk']] = risk_df[['attendance_risk', 'exam_risk', 'fee_risk']].fillna(0)
 
-    @app.route("/api/metrics/score-progression")
-    def score_prog():
-        class_id = request.args.get("classId", "all")
-        subject_id = request.args.get("subjectId", "all")
-        with SessionLocal() as db:
-            q = db.query(models.ExamResult)
-            if class_id != "all":
-                q = q.join(models.Student).filter(models.Student.class_id == class_id)
-            if subject_id != "all":
-                q = q.filter(models.ExamResult.subject_id == subject_id)
-            by_date = {}
-            rows = q.all()
-            for r in rows:
-                key = r.date.isoformat()
-                by_date.setdefault(key, {"sum": 0.0, "count": 0})
-                by_date[key]["sum"] += r.score
-                by_date[key]["count"] += 1
-            data = [{"date": k, "avg_score": round(v["sum"]/v["count"], 1) if v["count"] else 0} for k, v in sorted(by_date.items())]
-            return jsonify(data)
+    # --- Calculate final risk score and level (your existing code) ---
+    risk_df['risk_score'] = (
+        0.4 * risk_df['attendance_risk'] +
+        0.4 * risk_df['exam_risk'] +
+        0.2 * risk_df['fee_risk']
+    )
 
-    @app.route("/api/metrics/subject-risk")
-    def subject_risk():
-        class_id = request.args.get("classId", "all")
-        with SessionLocal() as db:
-            # For each subject, count student max-risk level among their exam results in that subject
-            subjects = db.query(models.Subject).all()
-            data = []
-            for subj in subjects:
-                students = db.query(models.Student).join(models.ExamResult).filter(models.ExamResult.subject_id == subj.id)
-                if class_id != "all":
-                    students = students.filter(models.Student.class_id == class_id)
-                low=med=high=0
-                for st in students.distinct():
-                    lvl = st.risk_level or "low"
-                    if lvl == "high": high += 1
-                    elif lvl == "medium": med += 1
-                    else: low += 1
-                data.append({"subject": subj.name, "low": low, "medium": med, "high": high})
-            return jsonify(data)
+    def risk_category(score):
+        if score >= 0.7: return 'High'
+        elif score >= 0.4: return 'Medium'
+        return 'Low'
+    
+    risk_df['risk_level'] = risk_df['risk_score'].apply(risk_category)
 
-    return app
+    # Convert to dictionary for JSON response
+    return risk_df.to_dict(orient='records')
 
-def read_any(storage_file) -> pd.DataFrame:
-    filename = secure_filename(storage_file.filename)
-    ext = filename.rsplit(".", 1)[1].lower()
-    content = storage_file.read()
-    if ext == "csv":
-        return pd.read_csv(io.BytesIO(content))
-    else:
-        return pd.read_excel(io.BytesIO(content))
 
-def import_attendance(db: Session, df: pd.DataFrame) -> int:
-    # expected: student_id, date, present (0/1)
-    count = 0
-    for _, row in df.iterrows():
-        st = get_or_create_student(db, str(row["student_id"]))
-        att = models.Attendance(student_id=st.id, date=pd.to_datetime(row["date"]).date(), present=bool(int(row["present"])))
-        db.add(att); count += 1
-    db.commit()
-    return count
+@app.route('/risk', methods=['GET'])
+def get_risk():
+    risk_data = calculate_risk()
+    if isinstance(risk_data, dict) and "error" in risk_data:
+        return {"error": risk_data["error"]}
+    return {"risk": risk_data}
 
-def import_exams(db: Session, df: pd.DataFrame) -> int:
-    # expected: student_id, subject, date, score (0-100)
-    count = 0
-    for _, row in df.iterrows():
-        st = get_or_create_student(db, str(row["student_id"]))
-        subj = get_or_create_subject(db, str(row["subject"]))
-        er = models.ExamResult(student_id=st.id, subject_id=subj.id, date=pd.to_datetime(row["date"]).date(), score=float(row["score"]))
-        db.add(er); count += 1
-    db.commit()
-    return count
+def send_email_alert(to_email, subject, body):
+    sender_email = "your_email@gmail.com"
+    password = "your_app_password"
 
-def import_fees(db: Session, df: pd.DataFrame) -> int:
-    # expected: student_id, due_date, paid_date, amount_due, amount_paid
-    count = 0
-    for _, row in df.iterrows():
-        st = get_or_create_student(db, str(row["student_id"]))
-        fee = models.FeePayment(
-            student_id=st.id,
-            due_date=pd.to_datetime(row["due_date"]).date() if not pd.isna(row["due_date"]) else None,
-            paid_date=pd.to_datetime(row["paid_date"]).date() if not pd.isna(row["paid_date"]) else None,
-            amount_due=float(row["amount_due"]),
-            amount_paid=float(row["amount_paid"]),
-        )
-        db.add(fee); count += 1
-    db.commit()
-    return count
+    msg = MIMEText(body)
+    msg["Subject"] = subject
+    msg["From"] = sender_email
+    msg["To"] = to_email
 
-def recompute_all_risk(db: Session):
-    settings = ensure_default_settings(db)
-    students = db.query(models.Student).all()
-    for st in students:
-        # attendance %
-        total = db.query(models.Attendance).filter_by(student_id=st.id).count()
-        present = db.query(models.Attendance).filter_by(student_id=st.id, present=True).count()
-        st.attendance_pct = round((present/total)*100, 1) if total else 0.0
-        # avg score
-        results = db.query(models.ExamResult).filter_by(student_id=st.id).all()
-        if results:
-            st.avg_score = round(sum(r.score for r in results)/len(results), 1)
-        else:
-            st.avg_score = 0.0
-        # fee status and days overdue
-        latest_fee = db.query(models.FeePayment).filter_by(student_id=st.id).order_by(models.FeePayment.due_date.desc()).first()
-        fee_status = "ok"
-        days_overdue = 0
-        if latest_fee and latest_fee.due_date and (latest_fee.amount_due - latest_fee.amount_paid) > 0:
-            if latest_fee.paid_date is None or latest_fee.paid_date > latest_fee.due_date:
-                delta = (date.today() - latest_fee.due_date).days
-                days_overdue = max(0, delta)
-                fee_status = "overdue" if delta > 0 else "partial"
-            else:
-                fee_status = "partial" if (latest_fee.amount_due - latest_fee.amount_paid) > 0 else "ok"
-        st.fee_status = fee_status
-        st.risk_level = compute_risk_level(settings, st.attendance_pct, st.avg_score, days_overdue)
-        db.add(st)
-    db.commit()
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        server.login(sender_email, password)
+        server.sendmail(sender_email, to_email, msg.as_string())
 
-def get_or_create_student(db: Session, student_id: str) -> models.Student:
-    st = db.query(models.Student).filter_by(id=student_id).first()
-    if not st:
-        st = models.Student(id=student_id, name=f"Student {student_id}")
-        db.add(st); db.commit(); db.refresh(st)
-    return st
+@app.route('/send_alerts', methods=['POST'])
+def send_alerts():
+    risk_data = calculate_risk()  # Get calculated risk data
+    
+    # If there's an error, return it
+    if isinstance(risk_data, dict) and "error" in risk_data:
+        return jsonify({"error": risk_data["error"]}), 400
+    
+    # Convert to DataFrame for easier filtering
+    risk_df = pd.DataFrame(risk_data)
+    
+    # If no risk data
+    if risk_df.empty:
+        return jsonify({"message": "No students found to send alerts."}), 200
+    
+    # Filter students at Medium or High risk
+    risky_students = risk_df[risk_df['risk_level'] != 'Low']
+    
+    # Check if any risky students exist
+    if risky_students.empty:
+        return jsonify({"message": "No risky students to alert."}), 200
 
-def get_or_create_subject(db: Session, name: str) -> models.Subject:
-    s = db.query(models.Subject).filter_by(name=name).first()
-    if not s:
-        s = models.Subject(name=name)
-        db.add(s); db.commit(); db.refresh(s)
-    return s
+    # Send alerts
+    for _, row in risky_students.iterrows():
+        subject = "Student Risk Alert"
+        body = f"Student ID {row['student_id']} is at {row['risk_level']} risk."
+        
+        # ✅ Make sure your CSVs have mentor_email or guardian_email column
+        if 'mentor_email' in row and pd.notna(row['mentor_email']):
+            send_email_alert(row['mentor_email'], subject, body)
+    
+    return jsonify({"message": f"Alerts sent to {len(risky_students)} recipients!"}), 200
 
-app = create_app()
+@app.route('/student/<int:student_id>', methods=['GET'])
+def get_student_details(student_id):
+    """
+    Fetch details of a student by ID from uploaded Excel files.
+    """
+    # Use the in-memory storage, not undefined variables
+    attendance_df = student_data['attendance']
+    exams_df = student_data['exam_results']
+    fees_df = student_data['fee_payments']
+
+    # --- Attendance Data ---
+    student_attendance = attendance_df[attendance_df['student_id'] == student_id]
+    attendance_list = student_attendance[['present']].to_dict(orient='records')
+
+    # --- Exam Results ---
+    student_exams = exams_df[exams_df['student_id'] == student_id]
+    exams_list = student_exams[['score']].to_dict(orient='records')
+
+    # --- Fee Details ---
+    student_fees = fees_df[fees_df['student_id'] == student_id]
+    fee_info = {}
+    if not student_fees.empty:
+        fee_info = {
+            "amount_due": int(student_fees.iloc[0]['amount_due']),
+            "amount_paid": int(student_fees.iloc[0]['amount_paid']),
+             
+        }
+
+    # --- Student Name (if present in exam sheet or attendance sheet) ---
+    name = None
+    if 'name' in student_attendance.columns and not student_attendance.empty:
+        name = student_attendance.iloc[0]['name']
+    elif 'name' in student_exams.columns and not student_exams.empty:
+        name = student_exams.iloc[0]['name']
+
+    details = {
+        "student_id": student_id,
+        "name": name or "Unknown",
+        "attendance": attendance_list,
+        "exam_results": exams_list,
+        "fees": fee_info
+    }
+
+    return jsonify(details)
+
+
+
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
