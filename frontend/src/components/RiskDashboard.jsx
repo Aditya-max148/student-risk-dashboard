@@ -45,7 +45,6 @@ function RiskDashboard() {
 
     return (
         <div style={{ padding: "20px" }}>
-
             <h2 style={{ fontSize: '1.875rem', fontWeight: '600', color: 'red', marginBottom: '1rem', textAlign: 'center' }}>
                 📊 Student Risk Dashboard  
             </h2>

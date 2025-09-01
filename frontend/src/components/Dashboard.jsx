@@ -41,6 +41,8 @@ function SendAlerts() {
   }, []);
 
   return (
+    <div>
+     
     <div style={{ margin: "20px", }}>
       <h3>High-Risk Students</h3>
 
@@ -118,6 +120,7 @@ function SendAlerts() {
         </button>
         {message && <p>{message}</p>}
       </div>
+    </div>
     </div>
   );
 }

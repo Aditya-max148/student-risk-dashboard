@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 
 function Navbar() {
   const navbarStyle = {
-    backgroundColor: '#dcd3d3ff',
+    backgroundColor: 'blue',
+    text:'white',
     padding: '1rem',
     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
     borderRadius: '10px',
@@ -14,7 +15,7 @@ function Navbar() {
     display: 'flex',
     justifyContent: 'space-around',
     margin: 0,
-    padding: 0,
+    padding: 4,
   };
 
   const linkStyle = {
@@ -27,6 +28,7 @@ function Navbar() {
   };
 
   return (
+     
     <nav style={navbarStyle}>
       <ul style={navLinksStyle}>
         <li>
