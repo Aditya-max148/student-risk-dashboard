@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, useNavigate, Link } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, useNavigate, } from "react-router-dom";
 import UploadForm from "./components/UploadForm";
 import RiskDashboard from "./components/RiskDashboard";
-import Dashboard from "./components/Dashboard";
 import StudentDetails from "./components/StudentDetails";
 import Navbar from "./components/Navbar";
 import axios from "axios";
 import SchoolDashboard from "./components/SchoolDashboard";
+import Filters from "./components/Filters";
+import NotificationPanel from "./components/NotificationPanel";
 
 // NEW: Separated the Dashboard UI into its own page
 
 function DashboardPage() {
   const navigate = useNavigate(); // ✅ FIX: useNavigate is now inside DashboardPage
-  const handleFinalSubmit = () => navigate("/dashboard");
+  const handleFinalSubmit = () => navigate("/reports");
 
   const [students, setStudents] = useState([]);
   const [stats, setStats] = useState({
@@ -84,68 +85,7 @@ function DashboardPage() {
   return (
     <div style={{ fontFamily: "Arial, sans-serif", backgroundColor: "#f9fafb", minHeight: "100vh", padding: "20px" }}>
       {/* Top Navigation */}
-      <div style={{ backgroundColor: "#fff", padding: "10px 20px", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
-        <div style={{ fontSize: "20px", fontWeight: "bold" }}>EduDash</div>
-        <div style={{ display: "flex", gap: "20px", alignItems: "center", fontSize: "14px" }}>
-          <div
-      style={{
-        display: "flex",
-        gap: "20px",
-        padding: "10px 20px",
-         
-      }}
-    >
-      <Link
-        to="/dashboard"
-        style={{
-          textDecoration: "none",
-          color: "#007BFF",
-          fontWeight: "600",
-          cursor: "pointer",
-        }}
-      >
-        Dashboard
-      </Link>
-
-      <Link
-        to="/students"
-        style={{
-          textDecoration: "none",
-          color: "#007BFF",
-          fontWeight: "600",
-          cursor: "pointer",
-        }}
-      >
-        Students
-      </Link>
-
-      <Link
-        to="/reports"
-        style={{
-          textDecoration: "none",
-          color: "#007BFF",
-          fontWeight: "600",
-          cursor: "pointer",
-        }}
-      >
-        Reports
-      </Link>
-
-      <Link
-        to="/settings"
-        style={{
-          textDecoration: "none",
-          color: "#007BFF",
-          fontWeight: "600",
-          cursor: "pointer",
-        }}
-      >
-        Settings
-      </Link>
-    </div>
-          <div style={{ width: "32px", height: "32px", borderRadius: "50%", backgroundColor: "#ccc" }}></div>
-        </div>
-      </div>
+      <Navbar/>
 
       {/* Dashboard Overview */}
       <h2 style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "5px" }}>Dashboard Overview</h2>
@@ -383,9 +323,10 @@ function AppContent() {
             </button>
           </>
         } />
-        <Route path="/dashboard" element={<RiskDashboard />} />
-        <Route path="/students" element={<SchoolDashboard />} />
-        <Route path="/sent-alerts" element={<Dashboard />} />
+        <Route path="/reports" element={<RiskDashboard />} />
+        <Route path="/school" element={<SchoolDashboard />} />
+        <Route path="/filters" element={<Filters/>} />
+        <Route path="/notification" element={<NotificationPanel/>} />
         <Route path="/student-details" element={<StudentDetails />} />
       </Routes>
     </div>

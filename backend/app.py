@@ -7,7 +7,10 @@ import io
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from openpyxl import Workbook
-import sqlite3
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import colors
+
 
 app = Flask(__name__)
 CORS(app)  # Allow React frontend to access backend
@@ -214,8 +217,102 @@ def get_student_details(student_id):
     return jsonify(details)
 
 
+@app.route('/generate-report', methods=['GET'])
+def generate_report():
+    # 1) Get data
+    risk_data = calculate_risk()
+    if isinstance(risk_data, dict) and "error" in risk_data:
+        # If uploads are missing you’ll get here
+        return jsonify({"error": risk_data["error"]}), 400
 
+    df = pd.DataFrame(risk_data)
 
+    # 2) Build PDF in memory
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, leftMargin=36, rightMargin=36, topMargin=36, bottomMargin=36)
+    styles = getSampleStyleSheet()
+    elements = []
+
+    # Title
+    elements.append(Paragraph("Dropout Probability Report", styles["Title"]))
+    elements.append(Spacer(1, 8))
+    elements.append(Paragraph("Generated from uploaded attendance, exam, and fee data.", styles["Normal"]))
+    elements.append(Spacer(1, 16))
+
+    # 3) Summary block
+    total = len(df)
+    high = int((df["risk_level"] == "High").sum())
+    med  = int((df["risk_level"] == "Medium").sum())
+    low  = int((df["risk_level"] == "Low").sum())
+    avg_score = f"{(df['risk_score'].mean() * 100):.2f}%"
+
+    summary_rows = [
+        ["Metric", "Value"],
+        ["Total Students", total],
+        ["High Risk", high],
+        ["Medium Risk", med],
+        ["Low Risk", low],
+        ["Average Risk Score", avg_score],
+    ]
+    summary_table = Table(summary_rows, colWidths=[200, 200])
+    summary_table.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
+        ("FONTNAME",   (0,0), (-1,0), "Helvetica-Bold"),
+        ("GRID",       (0,0), (-1,-1), 0.25, colors.grey),
+        ("BOTTOMPADDING", (0,0), (-1,0), 8),
+        ("ALIGN", (1,1), (1,-1), "RIGHT"),
+    ]))
+    elements.append(summary_table)
+    elements.append(Spacer(1, 20))
+
+    # 4) Top at-risk students table
+    elements.append(Paragraph("Top At-Risk Students", styles["Heading2"]))
+    elements.append(Spacer(1, 6))
+
+    # Sort by risk score (desc) and take top N
+    top = df.sort_values("risk_score", ascending=False).head(15)
+
+    # Build reason string per student
+    table_data = [["ID", "Name", "Risk Level", "Risk Score", "Reasons"]]
+    for _, r in top.iterrows():
+        reasons = []
+        if r.get("attendance_risk", 0) > 0: reasons.append("Attendance")
+        if r.get("exam_risk", 0) > 0:       reasons.append("Exam")
+        if r.get("fee_risk", 0) > 0:        reasons.append("Fees")
+
+        table_data.append([
+            str(r.get("student_id", "")),
+            str(r.get("name", "")),
+            str(r.get("risk_level", "")),
+            f"{float(r.get('risk_score', 0))*100:.1f}%",
+            ", ".join(reasons) if reasons else "—"
+        ])
+
+    students_table = Table(
+        table_data,
+        colWidths=[55, 135, 80, 70, 180],
+        repeatRows=1  # repeat header on new pages
+    )
+    students_table.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
+        ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+        ("GRID", (0,0), (-1,-1), 0.25, colors.grey),
+        ("ALIGN", (3,1), (3,-1), "RIGHT"),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+        ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.whitesmoke, colors.white]),
+        ("BOTTOMPADDING", (0,0), (-1,0), 6),
+    ]))
+    elements.append(students_table)
+
+    # 5) Build and send
+    doc.build(elements)
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name="dropout_probability_report.pdf",
+        mimetype="application/pdf"
+    )
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
+import Navbar from "./Navbar";
 
 function RiskDashboard() {
     const [riskData, setRiskData] = useState([]);
@@ -45,10 +46,14 @@ function RiskDashboard() {
 
     return (
         <div style={{ padding: "20px" }}>
-            <h2 style={{ fontSize: '1.875rem', fontWeight: '600', color: 'red', marginBottom: '1rem', textAlign: 'center' }}>
-                📊 Student Risk Dashboard  
-            </h2>
-            <div style={{ display: "flex", justifyContent: "center" }}>
+            <Navbar />
+            <div style={{ display: "flex", justifyContent: "center", backgroundColor: 'white', borderRadius: '1rem', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)', padding: '0.5rem', marginBottom: '2rem', textAlign: 'center' }}>
+                <h2 style={{ fontSize: '1.875rem', fontWeight: '600', color: 'red', marginBottom: '1rem', textAlign: 'center' }}>
+                    📊 Student Dropout Reports
+                </h2>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "center", backgroundColor: 'white', borderRadius: '1rem', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)', padding: '1.5rem', marginBottom: '2rem', textAlign: 'center' }}>
                 {/* Risk Distribution Chart */}
                 <PieChart width={400} height={300}>
                     <Pie
@@ -79,37 +84,37 @@ function RiskDashboard() {
 
             <div style={{ padding: '2rem', backgroundColor: '#f3f4f6', fontFamily: 'Inter, sans-serif' }}>
                 {/* Risk Table */}
-                <table border="1" cellPadding="8" style={{ width: "100%", marginTop: "20px", marginBottom: '50px', borderCollapse: "collapse" }}>
-                    <thead>
-                        <tr style={{ background: "#f0f0f0" }}>
-                            <th>Student ID</th>
-                            <th>Student Name</th>
-                            <th>Attendance Risk</th>
-                            <th>Exam Risk</th>
-                            <th>Fee Risk</th>
-                            <th>Risk Score</th>
-                            <th>Risk Level</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {riskData.map((r, idx) => (
-                            <tr key={idx} style={{
-                                background: r.risk_level === "High" ? "#ffcccc" :
-                                    r.risk_level === "Medium" ? "#fff7cc" : "#ccffcc"
-                            }}>
-                                <td>{r.student_id}</td>
-                                <td>{r.name}</td>
-                                <td>{r.attendance_risk}</td>
-                                <td>{r.exam_risk}</td>
-                                <td>{r.fee_risk}</td>
-                                <td>{r.risk_score.toFixed(2)}</td>
-                                <td>{r.risk_level}</td>
+                <div style={{ display: "flex", justifyContent: "center", backgroundColor: 'white', borderRadius: '1rem', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)', padding: '1.5rem', marginBottom: '2rem', textAlign: 'center' }}>
+                    <table border="1" cellPadding="8" style={{ width: "100%", marginTop: "20px", marginBottom: '50px', borderCollapse: "collapse" }}>
+                        <thead>
+                            <tr style={{ background: "#f0f0f0" }}>
+                                <th>Student ID</th>
+                                <th>Student Name</th>
+                                <th>Attendance Risk</th>
+                                <th>Exam Risk</th>
+                                <th>Fee Risk</th>
+                                <th>Risk Score</th>
+                                <th>Risk Level</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
-
-
+                        </thead>
+                        <tbody>
+                            {riskData.map((r, idx) => (
+                                <tr key={idx} style={{
+                                    background: r.risk_level === "High" ? "#ffcccc" :
+                                        r.risk_level === "Medium" ? "#fff7cc" : "#ccffcc"
+                                }}>
+                                    <td>{r.student_id}</td>
+                                    <td>{r.name}</td>
+                                    <td>{r.attendance_risk}</td>
+                                    <td>{r.exam_risk}</td>
+                                    <td>{r.fee_risk}</td>
+                                    <td>{r.risk_score.toFixed(2)}</td>
+                                    <td>{r.risk_level}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
 
                 <div style={{ backgroundColor: 'white', borderRadius: '1rem', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)', padding: '1.5rem', marginBottom: '2rem' }}>
                     <h2 style={{ fontSize: '1.875rem', fontWeight: '600', color: '#dc2626', marginBottom: '1rem', textAlign: 'center' }}>

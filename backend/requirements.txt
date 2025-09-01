@@ -1,0 +1,7 @@
+flask
+flask-cors
+pandas
+reportlab
+openpyxl
+gunicorn
+
