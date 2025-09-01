@@ -7,7 +7,7 @@ function RiskDashboard() {
     const [riskData, setRiskData] = useState([]);
 
     useEffect(() => {
-        axios.get("http://127.0.0.1:5000/risk")
+        axios.get("https://student-risk-dashboard.onrender.com/risk")
             .then(res => {
                 if (res.data.error) {
                     setRiskData([]);

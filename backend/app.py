@@ -22,6 +22,12 @@ student_data = {
     "fee_payments": pd.DataFrame()
 }
 
+
+@app.route("/")
+def home():
+    return jsonify({"message": "Backend is running!"})
+
+
 @app.route('/upload/<data_type>', methods=['POST'])
 def upload_file(data_type):
     if 'file' not in request.files:

@@ -12,7 +12,7 @@ function SendAlerts() {
   // ✅ Fetch high-risk students
   const fetchHighRiskStudents = async () => {
     try {
-      const res = await axios.get("http://127.0.0.1:5000/risk");
+      const res = await axios.get("https://student-risk-dashboard.onrender.com/risk");
       const riskStudents = Array.isArray(res.data)
         ? res.data
         : res.data.risk || [];
@@ -28,7 +28,7 @@ function SendAlerts() {
 
   const handleSendAlerts = async () => {
     try {
-      const res = await axios.post("http://127.0.0.1:5000/send_alerts");
+      const res = await axios.post("https://student-risk-dashboard.onrender.com/send_alerts");
       setMessage(res.data.message || "Alerts sent successfully!");
     } catch (err) {
       console.error(err);

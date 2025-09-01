@@ -19,7 +19,7 @@ function SchoolDashboard() {
     // Fetch Data
     const fetchRiskData = async () => {
         try {
-            const res = await axios.get("http://127.0.0.1:5000/risk");
+            const res = await axios.get("https://student-risk-dashboard.onrender.com/risk");
             const studentsData = Array.isArray(res.data)
                 ? res.data
                 : res.data.risk || [];

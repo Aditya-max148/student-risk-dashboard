@@ -11,7 +11,7 @@ function UploadForm({ dataType }) {
     formData.append("file", file);
     try {
       const res = await axios.post(
-        `http://127.0.0.1:5000/upload/${dataType}`,
+        `https://student-risk-dashboard.onrender.com//upload/${dataType}`,
         formData
       );
       setMessage(res.data.message);
