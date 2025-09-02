@@ -67,7 +67,7 @@ function SchoolDashboard() {
             <Navbar />
 
             {/* Dashboard Header */}
-            <h2 style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "5px" }}>School Dashboard</h2>
+            <h2 style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "5px" }}>Class Dashboard</h2>
             <p style={{ color: "#6b7280", marginBottom: "20px" }}>Overview of school-wide performance and statistics</p>
 
             {/* Stats Cards */}

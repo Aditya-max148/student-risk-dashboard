@@ -6,7 +6,6 @@ import StudentDetails from "./components/StudentDetails";
 import Navbar from "./components/Navbar";
 import axios from "axios";
 import SchoolDashboard from "./components/SchoolDashboard";
-import Filters from "./components/Filters";
 import NotificationPanel from "./components/NotificationPanel";
 
 // NEW: Separated the Dashboard UI into its own page
@@ -85,7 +84,7 @@ function DashboardPage() {
   return (
     <div style={{ fontFamily: "Arial, sans-serif", backgroundColor: "#f9fafb", minHeight: "100vh", padding: "20px" }}>
       {/* Top Navigation */}
-      <Navbar/>
+      <Navbar />
 
       {/* Dashboard Overview */}
       <h2 style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "5px" }}>Dashboard Overview</h2>
@@ -157,12 +156,7 @@ function DashboardPage() {
 
           </div>
 
-          <div style={{ marginTop: "15px" }}>
-            <div style={{ fontSize: "14px", marginBottom: "5px" }}>Upload Progress</div>
-            <div style={{ backgroundColor: "#e5e7eb", borderRadius: "4px", height: "8px" }}>
-              <div style={{ backgroundColor: "#3b82f6", width: "0%", height: "100%", borderRadius: "4px" }}></div>
-            </div>
-          </div>
+
         </div>
 
         {/* Analytics */}
@@ -282,11 +276,13 @@ function DashboardPage() {
             ))}
           </div>
 
-          {/* Footer */}
-          <div style={{ textAlign: "center", fontSize: "12px", color: "#6b7280", marginTop: "20px" }}>
-            © 2025 EduDash. All rights reserved. | Privacy | Terms | Support
-          </div>
+
         </div>
+
+      </div>
+      {/* Footer */}
+      <div style={{ textAlign: "center", fontSize: "12px", color: "#6b7280", marginTop: "20px" }}>
+        © 2025 EduDash. All rights reserved. | Privacy | Terms | Support
       </div>
     </div>
   );
@@ -294,11 +290,6 @@ function DashboardPage() {
 
 // Main AppContent
 function AppContent() {
-  const navigate = useNavigate();
-
-  const handleSendAlerts = () => navigate("/sent-alerts");
-
-
 
   return (
     <div style={{ padding: "20px" }}>
@@ -306,27 +297,13 @@ function AppContent() {
         <Route path="/" element={
           <>
             <DashboardPage />
-            {/*<Navbar />
-            <h1 style={{ textAlign: "center" }}>Student Risk Dashboard</h1>
-            <UploadForm dataType="attendance" />
-            <UploadForm dataType="exam_results" />
-            <UploadForm dataType="fee_payments" />
-            <hr style={{ margin: "30px 0" }} />*/}
 
-
-
-            <button
-              onClick={handleSendAlerts}
-              style={{ padding: "10px 20px", margin: "20px", fontSize: "16px", backgroundColor: "#4128a7", color: "white", border: "none", borderRadius: "5px", cursor: "pointer" }}
-            >
-              Send Alert
-            </button>
           </>
         } />
         <Route path="/reports" element={<RiskDashboard />} />
         <Route path="/school" element={<SchoolDashboard />} />
-        <Route path="/filters" element={<Filters/>} />
-        <Route path="/notification" element={<NotificationPanel/>} />
+         
+        <Route path="/notification" element={<NotificationPanel />} />
         <Route path="/student-details" element={<StudentDetails />} />
       </Routes>
     </div>

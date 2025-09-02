@@ -1,28 +1,53 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Navbar from "./Navbar";
-import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 const NotificationPanel = () => {
-    const navigate = useNavigate();
     const [students, setStudents] = useState([]);
-    const [stats, setStats] = useState({
-        totalStudents: 0,
-        highRiskCount: 0,
-        attendanceRate: 0,
-        feePaymentRate: 0,
-    });
+    const [resolvedStudents, setResolvedStudents] = useState([]);
 
+    // ✅ Function to mark student as resolved
+    const markResolved = (studentId) => {
+        setResolvedStudents((prev) => [...prev, studentId]);
+    };
+
+    // ✅ Fetch risk data
+    const fetchRiskData = useCallback(async () => {
+        try {
+            const res = await axios.get(
+                "https://student-risk-dashboard.onrender.com/risk"
+            );
+            const studentsData = Array.isArray(res.data)
+                ? res.data
+                : res.data.risk || [];
+
+            const highRisk = studentsData.filter(
+                (s) => s.risk_level?.toUpperCase() === "HIGH"
+            );
+
+            setStudents(highRisk);
+        } catch (err) {
+            console.error("Error fetching risk data:", err);
+        }
+    }, []);
+
+    // ✅ Fetch data on mount
+    useEffect(() => {
+        fetchRiskData();
+    }, [fetchRiskData]);
+
+    // ✅ Handle report download
     const handleGenerateReport = async () => {
         try {
-            const response = await axios.get("https://student-risk-dashboard.onrender.com/generate-report", { responseType: "blob" });  
+            const response = await axios.get(
+                "https://student-risk-dashboard.onrender.com/generate-report",
+                { responseType: "blob" }
+            );
 
-
-            // Create download link
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement("a");
             link.href = url;
-            link.setAttribute("download", "dropout_probability_report.pdf"); // Change extension if CSV
+            link.setAttribute("download", "dropout_probability_report.pdf");
             document.body.appendChild(link);
             link.click();
         } catch (error) {
@@ -30,66 +55,18 @@ const NotificationPanel = () => {
             alert("Failed to generate report.");
         }
     };
-    // Fetch Risk Data
-    const fetchRiskData = async () => {
-        try {
-            const res = await axios.get("https://student-risk-dashboard.onrender.com/risk");
-            const studentsData = Array.isArray(res.data)
-                ? res.data
-                : res.data.risk || [];
 
-            const totalStudents = studentsData.length;
-            const highRisk = studentsData.filter(
-                (s) => s.risk_level?.toUpperCase() === "HIGH"
-            );
-
-            const attendanceRiskCount = studentsData.filter(
-                (s) => s.attendance_risk > 0
-            ).length;
-
-            const attendanceRate =
-                totalStudents > 0
-                    ? (
-                        ((totalStudents - attendanceRiskCount) / totalStudents) *
-                        100
-                    ).toFixed(2)
-                    : 0;
-
-            const feeRiskCount = studentsData.filter((s) => s.fee_risk > 0).length;
-            const feePaymentRate =
-                totalStudents > 0
-                    ? (
-                        ((totalStudents - feeRiskCount) / totalStudents) *
-                        100
-                    ).toFixed(2)
-                    : 0;
-
-            setStudents(highRisk); // Only keep high-risk students for alerts
-            setStats({
-                totalStudents,
-                highRiskCount: highRisk.length,
-                attendanceRate,
-                feePaymentRate,
-            });
-        } catch (err) {
-            console.error("Error fetching risk data:", err);
-        }
-    };
-
-    useEffect(() => {
-        fetchRiskData();
-    }, []);
     return (
         <div
-            style={{ padding: "24px", backgroundColor: "#f9fafb", minHeight: "100vh", fontFamily: "Arial, sans-serif" }}
+            style={{
+                padding: "24px",
+                backgroundColor: "#f9fafb",
+                minHeight: "100vh",
+                fontFamily: "Arial, sans-serif",
+            }}
         >
-
-            {/* Sidebar */}
             <Navbar />
-
-            {/* Main Content */}
             <div style={{ flex: 1, padding: "20px" }}>
-                {/* Header */}
                 <div
                     style={{
                         display: "flex",
@@ -101,14 +78,6 @@ const NotificationPanel = () => {
                     <h1 style={{ fontSize: "24px", fontWeight: "bold", color: "red" }}>
                         Notifications / Alerts Panel
                     </h1>
-                    <div
-                        style={{
-                            width: "40px",
-                            height: "40px",
-                            borderRadius: "50%",
-                            backgroundColor: "#ddd",
-                        }}
-                    ></div>
                 </div>
 
                 {/* Notification Cards */}
@@ -122,63 +91,75 @@ const NotificationPanel = () => {
                     }}
                 >
                     {students.length > 0 ? (
-                        students.map((student, index) => (
-                            <div
-                                key={student.student_id || index}
-                                style={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                    padding: "15px 0",
-                                    borderBottom:
-                                        index !== students.length - 1 ? "1px solid #eee" : "none",
-                                }}
-                            >
-                                <p style={{ fontWeight: "500", margin: 0, color: "#333" }}>
-                                    {student.name || `Student ${index + 1}`} at{" "}
-                                    <span style={{ color: "red" }}>High Risk</span> -- Notify Parent?
-                                </p>
-                                <div>
-                                    <button
-                                        style={{
-                                            padding: "6px 12px",
-                                            border: "1px solid #ddd",
-                                            backgroundColor: "#fff",
-                                            marginRight: "5px",
-                                            cursor: "pointer",
-                                            borderRadius: "4px",
-                                        }}
-                                        onClick={() =>
-                                            alert(`Email sent to ${student.parent_email || "Parent"}`)
-                                        }
-                                    >
-                                        Email
-                                    </button>
-                                    <button
-                                        style={{
-                                            padding: "6px 12px",
-                                            border: "1px solid #ddd",
-                                            backgroundColor: "#fff",
-                                            cursor: "pointer",
-                                            borderRadius: "4px",
-                                        }}
-                                        onClick={() =>
-                                            alert(
-                                                `Marked ${student.name || "Student"} as resolved.`
-                                            )
-                                        }
-                                    >
-                                        Mark as Resolved
-                                    </button>
+                        students.map((student, index) => {
+                            const isResolved = resolvedStudents.includes(student.student_id);
+                            return (
+                                <div
+                                    key={student.student_id || index}
+                                    style={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        padding: "15px 15px",
+                                        borderRadius: "20px",
+                                        borderBottom:
+                                            index !== students.length - 1
+                                                ? "1px solid #eee"
+                                                : "none",
+                                        backgroundColor: isResolved ? "#e6ffed" : "#ffe6e6",
+                                    }}
+                                >
+                                    <p style={{ fontWeight: "500", margin: 0, color: "#333" }}>
+                                        {student.name || `Student ${index + 1}`} at{" "}
+                                        <span style={{ color: "red" }}>High Risk</span> -- Notify
+                                        Parent?
+                                    </p>
+                                    <div>
+                                        <button
+                                            style={{
+                                                backgroundColor: isResolved ? "green" : "#fff",
+                                                color: isResolved ? "#fff" : "#000",
+                                                cursor: "pointer",
+                                                padding: "10px 16px",
+                                                border: "none",
+                                                borderRadius: "6px",
+                                                fontWeight: "bold",
+                                                marginRight: "10px",
+                                            }}
+                                            onClick={() =>
+                                                alert(
+                                                    `Email sent to ${student.parent_email || "Parent"
+                                                    }`
+                                                )
+                                            }
+                                        >
+                                            Email
+                                        </button>
+                                        <button
+                                            style={{
+                                                backgroundColor: isResolved ? "green" : "#fff",
+                                                color: isResolved ? "#fff" : "#000",
+                                                cursor: "pointer",
+                                                padding: "10px 16px",
+                                                border: "none",
+                                                borderRadius: "6px",
+                                                fontWeight: "bold",
+                                            }}
+                                            onClick={() => markResolved(student.student_id)}
+                                        >
+                                            {isResolved ? "✅ Resolved" : "Mark as Resolved"}
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                        ))
+                            );
+                        })
                     ) : (
                         <p style={{ textAlign: "center", color: "#999" }}>
                             No high-risk students right now.
                         </p>
                     )}
                 </div>
+
                 {/* Reports Section */}
                 <div
                     style={{
