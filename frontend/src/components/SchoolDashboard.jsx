@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
- 
+
 import AttendanceRiskChart from "./AttendanceRiskChart";
 import Navbar from "./Navbar";
 import ExamRiskChart from "./ExamRiskChart";
@@ -15,6 +15,21 @@ function SchoolDashboard() {
         attendanceRate: 0,
         feePaymentRate: 0,
     });
+
+    const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
+    // Track window size for responsiveness
+    useEffect(() => {
+        const handleResize = () => setWindowWidth(window.innerWidth);
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
+    // Responsive Layout Settings
+    const isMobile = windowWidth < 768;
+    const isTablet = windowWidth >= 768 && windowWidth < 1024;
+
+    const gridColsStats = isMobile ? "1fr" : isTablet ? "1fr 1fr" : "repeat(4, 1fr)";
+     
 
     // Fetch Data
     const fetchRiskData = async () => {
@@ -71,20 +86,31 @@ function SchoolDashboard() {
             <p style={{ color: "#6b7280", marginBottom: "20px" }}>Overview of school-wide performance and statistics</p>
 
             {/* Stats Cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "20px", marginBottom: "20px" }}>
+            <div style={{
+                display: "grid",
+                gridTemplateColumns: gridColsStats,
+                gap: "20px",
+                marginBottom: "20px"
+            }}>
                 {[
                     { title: "Total Students", value: stats.totalStudents, change: "↑ 12% from last month" },
-                    { title: "Attendance Rate", value: `${stats.attendanceRate}%`, change: "↓ 1.2% from last week" },
-                    { title: "Fees Collected", value: `${stats.feePaymentRate}%`, change: "↑ 5% from last month" },
-                    { title: "Near-dropout students", value: stats.highRiskCount, change: "↓ 20% Dropout Increase" },
+                    { title: "Attendance Rate", value: `${stats.attendanceRate}%`, change: "↑ 1.2% from last week" },
+                    { title: "Fees Collected", value: `${stats.feePaymentRate}%`, change: "↓ 5% from last month" },
+                    { title: "Dropout Student", value: stats.highRiskCount, change: "↓ Near By Dropout" },
                 ].map((card, idx) => (
-                    <div key={idx} style={{ backgroundColor: "#fff", padding: "20px", borderRadius: "8px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
+                    <div key={idx} style={{
+                        backgroundColor: "#fff",
+                        padding: "20px",
+                        borderRadius: "8px",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+                    }}>
                         <div style={{ fontSize: "14px", color: "#6b7280" }}>{card.title}</div>
-                        <div style={{ fontSize: "28px", fontWeight: "bold", margin: "5px 0" }}>{card.value}</div>
+                        <div style={{ fontSize: isMobile ? "22px" : "28px", fontWeight: "bold", margin: "5px 0" }}>{card.value}</div>
                         <div style={{ fontSize: "12px", color: card.change.includes("↓") ? "red" : "green" }}>{card.change}</div>
                     </div>
                 ))}
             </div>
+
 
             {/* Charts Section */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "16px", marginBottom: "24px" }}>
@@ -95,7 +121,7 @@ function SchoolDashboard() {
                 </div>
 
                 {/* Risk Pie Chart */}
-                 <div style={{ padding: "24px", backgroundColor: "#fff", borderRadius: "8px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
+                <div style={{ padding: "24px", backgroundColor: "#fff", borderRadius: "8px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
                     <h3 style={{ fontWeight: "600", marginBottom: "8px" }}>Performance Overview</h3>
                     <ExamRiskChart data={students} />
                 </div>

@@ -67,15 +67,24 @@ const NotificationPanel = () => {
         >
             <Navbar />
             <div style={{ flex: 1, padding: "20px" }}>
+                {/* Header */}
                 <div
                     style={{
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
                         marginBottom: "20px",
+                        flexWrap: "wrap",
                     }}
                 >
-                    <h1 style={{ fontSize: "24px", fontWeight: "bold", color: "red" }}>
+                    <h1
+                        style={{
+                            fontSize: "24px",
+                            fontWeight: "bold",
+                            color: "red",
+                            marginBottom: "10px",
+                        }}
+                    >
                         Notifications / Alerts Panel
                     </h1>
                 </div>
@@ -103,10 +112,10 @@ const NotificationPanel = () => {
                                         padding: "15px 15px",
                                         borderRadius: "20px",
                                         borderBottom:
-                                            index !== students.length - 1
-                                                ? "1px solid #eee"
-                                                : "none",
+                                            index !== students.length - 1 ? "1px solid #eee" : "none",
                                         backgroundColor: isResolved ? "#e6ffed" : "#ffe6e6",
+                                        flexWrap: "wrap",
+                                        marginBottom: "10px",
                                     }}
                                 >
                                     <p style={{ fontWeight: "500", margin: 0, color: "#333" }}>
@@ -114,17 +123,18 @@ const NotificationPanel = () => {
                                         <span style={{ color: "red" }}>High Risk</span> -- Notify
                                         Parent?
                                     </p>
-                                    <div>
+                                    <div style={{ marginTop: "10px" }}>
                                         <button
                                             style={{
                                                 backgroundColor: isResolved ? "green" : "#fff",
                                                 color: isResolved ? "#fff" : "#000",
                                                 cursor: "pointer",
                                                 padding: "10px 16px",
-                                                border: "none",
+                                                border: "1px solid #ddd",
                                                 borderRadius: "6px",
                                                 fontWeight: "bold",
                                                 marginRight: "10px",
+                                                transition: "all 0.3s ease",
                                             }}
                                             onClick={() =>
                                                 alert(
@@ -141,9 +151,10 @@ const NotificationPanel = () => {
                                                 color: isResolved ? "#fff" : "#000",
                                                 cursor: "pointer",
                                                 padding: "10px 16px",
-                                                border: "none",
+                                                border: "1px solid #ddd",
                                                 borderRadius: "6px",
                                                 fontWeight: "bold",
+                                                transition: "all 0.3s ease",
                                             }}
                                             onClick={() => markResolved(student.student_id)}
                                         >
@@ -182,6 +193,7 @@ const NotificationPanel = () => {
                             cursor: "pointer",
                             borderRadius: "6px",
                             fontWeight: "bold",
+                            transition: "all 0.3s ease",
                         }}
                     >
                         Generate Dropout Probability Report

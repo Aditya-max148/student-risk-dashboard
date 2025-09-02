@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, useNavigate, } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-router-dom";
 import UploadForm from "./components/UploadForm";
 import RiskDashboard from "./components/RiskDashboard";
 import StudentDetails from "./components/StudentDetails";
@@ -8,10 +8,8 @@ import axios from "axios";
 import SchoolDashboard from "./components/SchoolDashboard";
 import NotificationPanel from "./components/NotificationPanel";
 
-// NEW: Separated the Dashboard UI into its own page
-
 function DashboardPage() {
-  const navigate = useNavigate(); // ✅ FIX: useNavigate is now inside DashboardPage
+  const navigate = useNavigate();
   const handleFinalSubmit = () => navigate("/reports");
 
   const [students, setStudents] = useState([]);
@@ -21,7 +19,14 @@ function DashboardPage() {
     attendanceRate: 0,
     feePaymentRate: 0,
   });
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
+  // Track window size for responsiveness
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const fetchHighRiskStudents = async () => {
     try {
@@ -30,33 +35,23 @@ function DashboardPage() {
         ? res.data
         : res.data.risk || [];
 
-      // Total students
       const totalStudents = studentsData.length;
-
-      // High-risk students
       const highRisk = studentsData.filter(
         (student) => student.risk_level?.toUpperCase() === "HIGH"
       );
 
-
-
-      // Attendance Risk %
-      const attendanceRiskCount = studentsData.filter(
-        (s) => s.attendance_risk > 0
-      ).length;
+      const attendanceRiskCount = studentsData.filter((s) => s.attendance_risk > 0).length;
       const attendanceRate =
         totalStudents > 0
           ? (((totalStudents - attendanceRiskCount) / totalStudents) * 100).toFixed(2)
           : 0;
 
-      // Fee Payment Rate %
       const feeRiskCount = studentsData.filter((s) => s.fee_risk > 0).length;
       const feePaymentRate =
         totalStudents > 0
           ? (((totalStudents - feeRiskCount) / totalStudents) * 100).toFixed(2)
           : 0;
 
-      // Update State
       setStudents(studentsData);
       setStats({
         totalStudents,
@@ -69,45 +64,62 @@ function DashboardPage() {
     }
   };
 
-  const highRisk = students.filter(
-    (s) => s.risk_level?.toUpperCase() === "HIGH"
-  );
-  const mediumRisk = students.filter(
-    (s) => s.risk_level?.toUpperCase() === "MEDIUM"
-  );
-
-
   useEffect(() => {
     fetchHighRiskStudents();
   }, []);
 
+  const highRisk = students.filter((s) => s.risk_level?.toUpperCase() === "HIGH");
+  const mediumRisk = students.filter((s) => s.risk_level?.toUpperCase() === "MEDIUM");
+
+  // Responsive Layout Settings
+  const isMobile = windowWidth < 768;
+  const isTablet = windowWidth >= 768 && windowWidth < 1024;
+
+  const gridColsStats = isMobile ? "1fr" : isTablet ? "1fr 1fr" : "repeat(4, 1fr)";
+  const gridColsMain = isMobile ? "1fr" : "1fr 1fr";
+
   return (
-    <div style={{ fontFamily: "Arial, sans-serif", backgroundColor: "#f9fafb", minHeight: "100vh", padding: "20px" }}>
-      {/* Top Navigation */}
+    <div style={{ fontFamily: "Arial, sans-serif", backgroundColor: "#f9fafb", minHeight: "100vh", padding: isMobile ? "10px" : "20px" }}>
       <Navbar />
 
-      {/* Dashboard Overview */}
-      <h2 style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "5px" }}>Dashboard Overview</h2>
-      <p style={{ color: "#6b7280", marginBottom: "20px" }}>Manage your educational data and monitor key metrics</p>
+      <h2 style={{ fontSize: isMobile ? "20px" : "24px", fontWeight: "bold", marginBottom: "5px" }}>Dashboard Overview</h2>
+      <p style={{ color: "#6b7280", marginBottom: "20px", fontSize: isMobile ? "12px" : "14px" }}>
+        Manage your educational data and monitor key metrics
+      </p>
 
       {/* Stats Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "20px", marginBottom: "20px" }}>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: gridColsStats,
+        gap: "20px",
+        marginBottom: "20px"
+      }}>
         {[
           { title: "Total Students", value: stats.totalStudents, change: "↑ 12% from last month" },
           { title: "Attendance Rate", value: `${stats.attendanceRate}%`, change: "↑ 1.2% from last week" },
           { title: "Fees Collected", value: `${stats.feePaymentRate}%`, change: "↓ 5% from last month" },
           { title: "Dropout Student", value: stats.highRiskCount, change: "↓ Near By Dropout" },
         ].map((card, idx) => (
-          <div key={idx} style={{ backgroundColor: "#fff", padding: "20px", borderRadius: "8px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
+          <div key={idx} style={{
+            backgroundColor: "#fff",
+            padding: "20px",
+            borderRadius: "8px",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+          }}>
             <div style={{ fontSize: "14px", color: "#6b7280" }}>{card.title}</div>
-            <div style={{ fontSize: "28px", fontWeight: "bold", margin: "5px 0" }}>{card.value}</div>
+            <div style={{ fontSize: isMobile ? "22px" : "28px", fontWeight: "bold", margin: "5px 0" }}>{card.value}</div>
             <div style={{ fontSize: "12px", color: card.change.includes("↓") ? "red" : "green" }}>{card.change}</div>
           </div>
         ))}
       </div>
 
       {/* Data Upload & Analytics */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "20px" }}>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: gridColsMain,
+        gap: "20px",
+        marginBottom: "20px"
+      }}>
         {/* Upload Center */}
         <div style={{ backgroundColor: "#fff", padding: "20px", borderRadius: "8px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
           <h3 style={{ fontSize: "18px", fontWeight: "600", marginBottom: "10px" }}>Data Upload Center</h3>
@@ -116,18 +128,19 @@ function DashboardPage() {
             { label: "Exam Data", desc: "Import Exam Marks records", dataType: "exam_results" },
             { label: "Fee Records", desc: "Upload payment and fee collection data", dataType: "fee_payments" },
           ].map((item, idx) => (
-            <div key={idx} style={{ border: "2px dashed #d1d5db", padding: "15px", borderRadius: "8px", marginBottom: "10px", textAlign: "center" }}>
+            <div key={idx} style={{
+              border: "2px dashed #d1d5db",
+              padding: "15px",
+              borderRadius: "8px",
+              marginBottom: "10px",
+              textAlign: "center"
+            }}>
               <div style={{ fontWeight: "600", marginBottom: "5px" }}>{item.label}</div>
               <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "10px" }}>{item.desc}</div>
               <UploadForm dataType={item.dataType} />
             </div>
           ))}
-          <div style={{
-            display: "flex",
-            justifyContent: "center", // Horizontal center
-            alignItems: "center",     // Vertical center
-            marginTop: "20px",
-          }}>
+          <div style={{ display: "flex", justifyContent: "center", marginTop: "20px" }}>
             <button
               onClick={handleFinalSubmit}
               style={{
@@ -153,47 +166,25 @@ function DashboardPage() {
             >
               🚀 Generate Risk Dashboard
             </button>
-
           </div>
-
-
         </div>
 
         {/* Analytics */}
-        <div
-          style={{
-            backgroundColor: "#fff",
-            padding: "20px",
-            borderRadius: "8px",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-          }}
-        >
-          <h3
-            style={{
-              fontSize: "18px",
-              fontWeight: "600",
-              marginBottom: "20px",
-            }}
-          >
-            Risk Overview
-          </h3>
+        <div style={{
+          backgroundColor: "#fff",
+          padding: "20px",
+          borderRadius: "8px",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+        }}>
+          <h3 style={{ fontSize: "18px", fontWeight: "600", marginBottom: "20px" }}>Risk Overview</h3>
 
-          {/* High Risk Students */}
-          <div
-            style={{
-              border: "1px solid #e5e7eb",
-              borderRadius: "8px",
-              padding: "20px",
-              marginBottom: "20px",
-            }}
-          >
-            <h4 style={{ marginBottom: "10px", color: "#ef4444" }}>
-              🔴 High Risk Students
-            </h4>
+          {/* High Risk */}
+          <div style={{ border: "1px solid #e5e7eb", borderRadius: "8px", padding: "20px", marginBottom: "20px" }}>
+            <h4 style={{ marginBottom: "10px", color: "#ef4444" }}>🔴 High Risk Students</h4>
             {highRisk.length === 0 ? (
               <p style={{ color: "#9ca3af" }}>No high-risk students</p>
             ) : (
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: isMobile ? "12px" : "14px" }}>
                 <thead>
                   <tr style={{ textAlign: "left", borderBottom: "1px solid #ddd" }}>
                     <th style={{ padding: "8px" }}>ID</th>
@@ -203,15 +194,10 @@ function DashboardPage() {
                 </thead>
                 <tbody>
                   {highRisk.map((student) => (
-                    <tr
-                      key={student.student_id}
-                      style={{ borderBottom: "1px solid #eee" }}
-                    >
+                    <tr key={student.student_id} style={{ borderBottom: "1px solid #eee" }}>
                       <td style={{ padding: "8px" }}>{student.student_id}</td>
                       <td style={{ padding: "8px" }}>{student.name}</td>
-                      <td style={{ padding: "8px", color: "#ef4444" }}>
-                        {(student.risk_score * 100).toFixed(1)}%
-                      </td>
+                      <td style={{ padding: "8px", color: "#ef4444" }}>{(student.risk_score * 100).toFixed(1)}%</td>
                     </tr>
                   ))}
                 </tbody>
@@ -219,22 +205,13 @@ function DashboardPage() {
             )}
           </div>
 
-          {/* Medium Risk Students */}
-          <div
-            style={{
-              border: "1px solid #e5e7eb",
-              borderRadius: "8px",
-              padding: "20px",
-              marginBottom: "20px",
-            }}
-          >
-            <h4 style={{ marginBottom: "10px", color: "#f59e0b" }}>
-              🟠 Medium Risk Students
-            </h4>
+          {/* Medium Risk */}
+          <div style={{ border: "1px solid #e5e7eb", borderRadius: "8px", padding: "20px", marginBottom: "20px" }}>
+            <h4 style={{ marginBottom: "10px", color: "#f59e0b" }}>🟠 Medium Risk Students</h4>
             {mediumRisk.length === 0 ? (
               <p style={{ color: "#9ca3af" }}>No medium-risk students</p>
             ) : (
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: isMobile ? "12px" : "14px" }}>
                 <thead>
                   <tr style={{ textAlign: "left", borderBottom: "1px solid #ddd" }}>
                     <th style={{ padding: "8px" }}>ID</th>
@@ -244,22 +221,16 @@ function DashboardPage() {
                 </thead>
                 <tbody>
                   {mediumRisk.map((student) => (
-                    <tr
-                      key={student.student_id}
-                      style={{ borderBottom: "1px solid #eee" }}
-                    >
+                    <tr key={student.student_id} style={{ borderBottom: "1px solid #eee" }}>
                       <td style={{ padding: "8px" }}>{student.student_id}</td>
                       <td style={{ padding: "8px" }}>{student.name}</td>
-                      <td style={{ padding: "8px", color: "#f59e0b" }}>
-                        {(student.risk_score * 100).toFixed(1)}%
-                      </td>
+                      <td style={{ padding: "8px", color: "#f59e0b" }}>{(student.risk_score * 100).toFixed(1)}%</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             )}
           </div>
-
 
           {/* Recent Activity */}
           <div style={{ backgroundColor: "#fff", padding: "20px", borderRadius: "8px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
@@ -275,12 +246,9 @@ function DashboardPage() {
               </div>
             ))}
           </div>
-
-
         </div>
-
       </div>
-      {/* Footer */}
+
       <div style={{ textAlign: "center", fontSize: "12px", color: "#6b7280", marginTop: "20px" }}>
         © 2025 EduDash. All rights reserved. | Privacy | Terms | Support
       </div>
@@ -288,21 +256,13 @@ function DashboardPage() {
   );
 }
 
-// Main AppContent
 function AppContent() {
-
   return (
     <div style={{ padding: "20px" }}>
       <Routes>
-        <Route path="/" element={
-          <>
-            <DashboardPage />
-
-          </>
-        } />
+        <Route path="/" element={<DashboardPage />} />
         <Route path="/reports" element={<RiskDashboard />} />
         <Route path="/school" element={<SchoolDashboard />} />
-         
         <Route path="/notification" element={<NotificationPanel />} />
         <Route path="/student-details" element={<StudentDetails />} />
       </Routes>
